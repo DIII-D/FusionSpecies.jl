@@ -1,18 +1,16 @@
 
 using FusionSpecies
+import FusionSpecies: @_add_species, @species_set
 show_elements()
 
-@add_species D¹⁺
-@add_species D⁰
-@add_species C
-@add_species Be
-@add_species e⁻
+@_add_species D
+@_add_species D⁰
+@_add_species C
+@_add_species Be
+@_add_species e⁻
 
-FusionSpecies.get_species(1)
+FusionSpecies.get_species(e⁻)
 
-@reset_species
-@add_species D¹⁺
-@add_species D⁰
-@add_species e⁻
-@setup_species
-FusionSpecies.get_species_iterators()
+species_set = @species_set D W C e⁻
+
+

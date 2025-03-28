@@ -76,8 +76,11 @@ macro _add_species(obj)
     for el in get_elements(species_set)
         push!(expr.args, :($(el.symbol) = FusionSpecies.get_element($(QuoteNode(el.symbol)))))
     end
-    println(expr)
-    expr
+    esc(expr)
+end
+
+macro species_set(obj)
+    FusionSpecies.get_species(obj)
 end
 
 function get_species(objs::Vector{Symbol})
