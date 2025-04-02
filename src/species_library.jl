@@ -73,7 +73,7 @@ end
     esc(blk)
 end
 
-@create_elements H He Be C Si W Ne Ar Xe Kr N Al Cr 
+@create_elements H He Be C Si W Ne Ar Xe Kr N Al Cr Fe Ni Cu O F Cl B 
 @create_element ∅ mass = 0 name = dummy atomic_number = 0 density = 0.0
 @create_element D mass = 2 * H.mass name = deuterium atomic_number = 1 density = 0.0 isotope=H
 @create_element T mass = 3 * H.mass name = tritium atomic_number = 1 density = 0.0 isotope=H
