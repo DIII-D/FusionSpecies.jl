@@ -32,7 +32,7 @@ const MoleculeSpecies = AbstractSpecies{<:Molecules}
 
 const IonsAtoms = Union{Ions,Atoms}
 
-struct Element{T<:ParticleType} <: AbstractElement
+mutable struct Element{T<:ParticleType} <: AbstractElement
     name::String
     symbol::Symbol
     atomic_number::ElementAtomicNumber
@@ -40,16 +40,18 @@ struct Element{T<:ParticleType} <: AbstractElement
     density::ElementDensity
     species::Vector{AbstractSpecies}
     isotope::Symbol
+    index::ElementIndex
 end
-abstract type AbstractMaterialElement <: AbstractElement end
-struct MaterialElement <: AbstractMaterialElement
-    name::String
-    symbol::Symbol
-    atomic_number::ElementAtomicNumber
-    mass::ElementMass
-    density::ElementDensity
-    isotope::Symbol
-end
+
+# abstract type AbstractMaterialElement <: AbstractElement end
+# struct MaterialElement <: AbstractMaterialElement
+#     name::String
+#     symbol::Symbol
+#     atomic_number::ElementAtomicNumber
+#     mass::ElementMass
+#     density::ElementDensity
+#     isotope::Symbol
+# end
 
 
 
@@ -68,23 +70,14 @@ const Elements = Union{Element,Vector{<:Element}}
 
 Element(element::Mendeleev.Element) = Element{Atoms}(element.name, Symbol(element.symbol), ElementAtomicNumber(element.number), ElementMass((element.atomic_mass |> u"kg").val), ElementDensity((element.density |> u"kg/m^3").val), Symbol(element.symbol))
 Element(n, s, a, m, d, isotope::Symbol; type=Atoms) = Element{type}(n, s, ElementAtomicNumber(a), ElementMass(m), ElementDensity(d), isotope)
-Element{T}(n, s, a, m, d, isotope) where {T<:Atoms} = Element{T}(n, s, a, m, d, [BaseSpecies(z, n, s, m, a, isotope) for z in 0:a.value], isotope)
-Element{T}(n, s, a, m, d, isotope) where {T<:Electron} = Element{T}(n, s, a, m, d, [BaseSpecies(a.value, n, s, m, a, isotope)], isotope)
+Element{T}(n, s, a, m, d, isotope) where {T<:Atoms} = Element{T}(n, s, a, m, d, [BaseSpecies(z, n, s, m, a, isotope) for z in 0:a.value], isotope, ElementIndex(0))
+Element{T}(n, s, a, m, d, isotope) where {T<:Electron} = Element{T}(n, s, a, m, d, [BaseSpecies(a.value, n, s, m, a, isotope)], isotope, ElementIndex(0))
 
 
 charge_states(el::Element)::Int64 = el.atomic_number.value
 atomic_number(el::Element)::Int64 = el.atomic_number.value
 export charge_states, atomic_number
 
-function Base.show(io::IO, ::MIME"text/plain", element::AbstractElement)
-    printstyled(io, "$(string(element.symbol))", color=element_color)
-    printstyled(io, "($(element.name))")
-end
-
-function Base.show(io::IO, element::AbstractElement)
-    printstyled(io, "$(string(element.symbol))", color=element_color)
-end
-inline_summary(el::Element) = stringstyled("$(el.symbol)", color=element_color) * " : " * el.name
 
 # ---------------------------------------------------------------------------------------------------------------------------------------------------- #
 struct BaseSpecies{T} <: AbstractBaseSpecies{T}
@@ -105,6 +98,11 @@ function BaseSpecies(z, el_name, el_symbol, el_mass::ElementMass, el_atomic_numb
     BaseSpecies{T}(SpeciesChargeState(z), el_name, s, el_symbol, SpeciesMass(el_mass), SpeciesAtomicNumber(el_atomic_number), isotope)
 end
 
+function LoadedElement(e::Element, i::Int64) 
+    e.index = ElementIndex(i)
+    return e
+end
+
 struct LoadedSpecies{T<:ParticleType} <: AbstractLoadedSpecies{T}
     charge_state::SpeciesChargeState
     name::String
@@ -118,6 +116,8 @@ struct LoadedSpecies{T<:ParticleType} <: AbstractLoadedSpecies{T}
     is_active::MutableBool
     is_main_species::MutableBool
 end
+
+
 
 
 function LoadedSpecies(s::BaseSpecies, idx::Int64)

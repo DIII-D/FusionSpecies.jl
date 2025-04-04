@@ -1,34 +1,34 @@
 abstract type AbstractSet end
 
-struct MaterialElementSet{T<:AbstractMaterialElement} <: AbstractSet
-    list_species::Vector{T}
-    dic_species::Dict{Int64,T}
-    lock::Vector{Bool}
-end
-MaterialElementSet() = SpeciesSet{MaterialElement}()
-MaterialElementSet{T}() where {T} = MaterialElementSet{T}(Vector{MaterialElement}(), Dict{Int64,MaterialElement}(), [false])
-MaterialElementSet(args...) = MaterialElementSet(args)
-MaterialElementSet(objs::Vector{Symbol}) = get_wall_elements(objs)
-struct SpeciesSet{T<:AbstractLoadedSpecies} <: AbstractSet
-    list_species::Vector{T}
-    dic_species::Dict{Int64,T}
+struct ElementsSet{T<:AbstractElement} <: AbstractSet
+    list::Vector{T}
+    dic::Dict{Int64,T}
     groups::Dict{Symbol,Any}
     lock::Vector{Bool}
 end
-get_elements(species_set::SpeciesSet) = unique([s.element for s in species_set.list_species])
+ElementsSet() = ElementsSet{AbstractElement}()
+ElementsSet{AbstractElement}() = ElementsSet{AbstractElement}(Vector{AbstractElement}(), Dict{Int64,AbstractElement}(), Dict{Symbol,Any}(), [false])
 
-Base.isempty(s::SpeciesSet) = isempty(s.list_species)
+struct SpeciesSet{T<:AbstractLoadedSpecies} <: AbstractSet
+    list::Vector{T}
+    dic::Dict{Int64,T}
+    groups::Dict{Symbol,Any}
+    lock::Vector{Bool}
+end
+get_elements(species_set::SpeciesSet) = unique([s.element for s in species_set.list])
+
+Base.isempty(s::SpeciesSet) = isempty(s.list)
 
 function SpeciesSet(v::Vector{T}) where {T<:AbstractLoadedSpecies}
-    dic_species = Dict{Int64,T}()
+    dic = Dict{Int64,T}()
     for s in v
-        dic_species[s.index.value] = s
+        dic[s.index.value] = s
     end
-    SpeciesSet(v, dic_species, Dict{Symbol,Any}(), [true])
+    SpeciesSet(v, dic, Dict{Symbol,Any}(), [true])
 end
-Base.getindex(s::AbstractSet, i::Int64) = s.list_species[i]
-Base.length(s::AbstractSet) = length(s.list_species)
-Base.iterate(s::AbstractSet, args...) = iterate(s.list_species, args...)
+Base.getindex(s::AbstractSet, i::Int64) = s.list[i]
+Base.length(s::AbstractSet) = length(s.list)
+Base.iterate(s::AbstractSet, args...) = iterate(s.list, args...)
 
 SpeciesSet() = SpeciesSet{LoadedSpecies}()
 SpeciesSet{T}() where {T} = SpeciesSet{T}(Vector{LoadedSpecies}(), Dict{Int64,LoadedSpecies}(), Dict{Symbol,Any}(), [false])
@@ -37,12 +37,23 @@ check_status(species_set::AbstractSet; lock=false, message="") = @assert species
 
 function add_species(obj::BaseSpecies, species_set::SpeciesSet)
     check_status(species_set)
-    tmp = LoadedSpecies(obj, get_next_species_index(species_set))
-    @assert tmp ∉ species_set.list_species "Species $obj already added.... \n List of current species in species set: $(species_set.list_species)"
-    push!(species_set.list_species, tmp)
+    tmp = LoadedSpecies(obj, get_next_index(species_set))
+    @assert tmp ∉ species_set.list "Species $obj already added.... \n List of current species in species set: $(species_set.list)"
+    push!(species_set.list, tmp)
 end
 add_species(obj::LoadedSpecies, species_set::SpeciesSet) = add_species(BaseSpecies(obj), species_set)
 
+function add_element(obj::Element, elements_set::ElementsSet)
+    check_status(elements_set)
+    tmp = LoadedElement(obj, get_next_index(elements_set))
+    @assert tmp ∉ elements_set.list "Species $obj already added.... \n List of current species in species set: $(species_elements.list)"
+    push!(elements_set.list, tmp)
+end
+
+function add_element(obj::Symbol, elements_set::ElementsSet)
+    obj ∈ keys(element_registry) && return add_element(element_registry[obj], elements_set)
+    error(" cannot find the element: $obj ...\n Available elements : $(keys(element_registry))")
+end
 
 function add_species(obj::Symbol, species_set::SpeciesSet)
     obj ∈ keys(element_registry) && return add_species(element_registry[obj], species_set)
@@ -70,7 +81,7 @@ end
 macro _add_species(obj)
     species_set = FusionSpecies.get_species(obj)
     expr = Expr(:block)
-    for s in species_set.list_species
+    for s in species_set.list
         push!(expr.args, :($(s.symbol) = FusionSpecies.get_species($(QuoteNode(s.symbol)))))
     end
     for el in get_elements(species_set)
@@ -79,9 +90,13 @@ macro _add_species(obj)
     esc(expr)
 end
 
-macro species_set(obj)
-    FusionSpecies.get_species(obj)
-end
+# macro species_set(obj)
+#     FusionSpecies.get_species(obj)
+# end
+
+# macro elements_set(obj)
+#     FusionSpecies.get_elements(obj)
+# end
 
 function get_species(objs::Vector{Symbol})
     species_set = SpeciesSet()
@@ -92,8 +107,8 @@ function get_species(objs::Vector{Symbol})
     return species_set
 end
 
-function get_wall_elements(objs::Vector{Symbol})
-    species_set = MaterialElementSet()
+function get_elements(objs::Vector{Symbol})
+    species_set = ElementsSet()
     for obj in objs
         add_species(getfield(@__MODULE__, obj), species_set)
     end
@@ -117,18 +132,26 @@ macro species_set(objs...)
     return species_set
 end
 
+macro elements_set(objs...)
+    elements_set = ElementsSet()
+    for obj in objs
+        add_element(obj, elements_set)
+    end
+    setup_elements!(elements_set)
+    return elements_set
+end
 
 function setup_species!(species_set::SpeciesSet)
-    list_species = species_set.list_species
-    @assert length(unique(list_species)) == length(list_species)
+    list = species_set.list
+    @assert length(unique(list)) == length(list)
 
-    list_idx = [v.index for v in species_set.list_species]
+    list_idx = [v.index for v in species_set.list]
     @assert length(unique(list_idx)) == length(list_idx)
-    els = [s.element for s in species_set.list_species]
+    els = [s.element for s in species_set.list]
     # update species stored in elements
     for el in els
         empty!(el.species)
-        for s in species_set.list_species
+        for s in species_set.list
             if s.element.symbol == el.symbol
                 push!(el.species, s)
             end
@@ -138,41 +161,43 @@ function setup_species!(species_set::SpeciesSet)
     species_set.lock[1] = true
 end
 
+function setup_elements!(set::ElementsSet)
+    list = set.list
+    @assert length(unique(list)) == length(list)
+    list_idx = [v.index for v in list]
+    @assert length(unique(list_idx)) == length(list_idx)
+    setup_groups!(set)
+    set.lock[1] = true
+end
+
+
 
 function check_species_index(species_set::SpeciesSet)
-    for (k, v) in species_set.dic_species
+    for (k, v) in species_set.dic
         @assert k == v.index
     end
-    indexes = sort([v.index for (k, v) in species_set.dic_species])
+    indexes = sort([v.index for (k, v) in species_set.dic])
     # check that indexes start at 1
     @assert minimum(indexes) == 1
     # check that indexes are incremental by 1
     @assert minimum(diff(indexes)) == maximum(diff(indexes)) == 1
 end
 
-function Base.show(io::IO, ::MIME"text/plain", species_set::SpeciesSet)
-    print(io, stringstyled("⟦", color=20) * (isempty(species_set) ? "∅" : join(name_.(species_set.list_species), "; ")) * stringstyled("⟧", color=20))
-end
 
-function Base.show(io::IO, species_set::SpeciesSet{T}) where {T}
-    print(io, stringstyled("⟦", color=20) * (isempty(species_set) ? "∅" : join(name_.(species_set.list_species), "; ")) * stringstyled("⟧", color=20))
-end
 
-name_(species_set::SpeciesSet) = join(name_.(species_set.list_species), " ")
-inline_summary(species_set::SpeciesSet) = join([name_(species) * "[$(species.index.value)]" for species in species_set.list_species], " ")
 
 import_species!(species_set::SpeciesSet, mod::Module; force_import::Bool=false, verbose=true) = import_species!(species_set, mod, force_import; verbose)
 function import_species!(species_set::SpeciesSet, mod::Module, force_import::Bool; verbose=true)
     list = []
     expr = quote end
-    for (i, s) in enumerate(species_set.list_species)
+    for (i, s) in enumerate(species_set.list)
         if !hasproperty(mod, s.symbol) || force_import
             push!(list, s)
             try #for main, cannot directly use setproperty! since julia v1.11
-                setproperty!(mod, s.symbol, species_set.list_species[i])
+                setproperty!(mod, s.symbol, species_set.list[i])
             catch
-                mod.eval(:($(s.symbol)=1)) 
-                setproperty!(mod, s.symbol, species_set.list_species[i])  
+                mod.eval(:($(s.symbol) = 1))
+                setproperty!(mod, s.symbol, species_set.list[i])
             end
         else
             println("warning: cannot import species $(name_(s)) into module $mod ...")
@@ -184,7 +209,7 @@ function import_species!(species_set::SpeciesSet, mod::Module, force_import::Boo
             try #for main, cannot directly use setproperty! since julia v1.11
                 setproperty!(mod, e.symbol, get_elements(species_set))
             catch
-                mod.eval(:($(e.symbol)=1)) 
+                mod.eval(:($(e.symbol) = 1))
                 setproperty!(mod, e.symbol, get_elements(species_set))
             end
         else
@@ -210,7 +235,9 @@ function set_main_species!(species_set::SpeciesSet, s)
 end
 
 # ---------------------------------------------------------------------------------------------- # 
-" species parameters in vector format "
+"""
+species parameters in vector format
+"""
 struct SpeciesParameters
     mass::SpeciesMasses
     μ::SpeciesReducedMasses

@@ -10,8 +10,7 @@ mutable struct SpeciesIterator{S<:SpeciesIndexes}
 end
 
 Base.iterate(s::SpeciesIterator, args...) = iterate(s.s)
-Base.show(io::IO, iter::SpeciesIterator) = print(io, sdoc(iter))
-Base.show(io::IO, ::MIME"text/plain", iter::SpeciesIterator) = print(io, sdoc(iter))
+
 Base.length(s::SpeciesIterator) = length(s.s)
 
 Base.copy(iter::SpeciesIterator) = SpeciesIterator(copy(iter.s), iter.species_set)

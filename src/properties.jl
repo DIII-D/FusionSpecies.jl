@@ -70,6 +70,10 @@ struct SpeciesReducedMasses <: AbstractSpeciesProperties
 end
 SpeciesReducedMasses(s::Vector{<:SpeciesMass}) = SpeciesReducedMasses(reshape([s1.value / (s1.value + s2.value) for (s1, s2) in Iterators.product(s, s)],length(s), length(s)))
 
+struct ElementIndex <: AbstractSpeciesIndex
+    value::Int64
+end
+ElementIndex() = ElementIndex(0)
 
 struct SpeciesIndex <: AbstractSpeciesIndex
     value::Int64
