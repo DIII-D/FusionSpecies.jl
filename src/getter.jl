@@ -14,7 +14,7 @@ function get_species_particle_type(s::BaseSpecies)::Type{<:ParticleType}
     end
 end
 
-get_species_abstract_type(s::AbstractSpecies{T}) where T = AbstractSpecies{<:T}
+get_species_abstract_type(s::AbstractSpecies{T}) where {T} = AbstractSpecies{<:T}
 
 
 function get_type_species(z::Float64)
@@ -48,7 +48,7 @@ function get_species_symbol(s::AbstractSpecies)
     return s.symbol
 end
 
-get_species_symbol(s::Vector) = mapreduce(s->get_species_symbol(s),vcat,s)
+get_species_symbol(s::Vector) = mapreduce(s -> get_species_symbol(s), vcat, s)
 
 get_species_symbol(s::Element) = s.symbol
 get_element(s::Union{AbstractSpecies,AbstractLoadedSpecies}) = return s.element
@@ -57,8 +57,8 @@ get_element(s::Union{AbstractSpecies,AbstractLoadedSpecies}) = return s.element
 get_element(s::AbstractElement) = return s
 
 function get_element(e::String)
-    @assert lowercase(e) ∈ lowercase.(getproperty.(values(element_registry),:name)) "Cannot find element $e in element_registry:$(keys(element_registry))"
-    return filter(v->lowercase(e) == lowercase(getproperty(v, :name)), collect(values(element_registry)))[1]
+    @assert lowercase(e) ∈ lowercase.(getproperty.(values(element_registry), :name)) "Cannot find element $e in element_registry:$(keys(element_registry))"
+    return filter(v -> lowercase(e) == lowercase(getproperty(v, :name)), collect(values(element_registry)))[1]
 end
 
 
@@ -74,7 +74,7 @@ end
 function get_list_elements()
 end
 
-function get_next_species_index()
+function get_next_index()
     if length([k for (k, v) in species_registry if typeof(v) <: AbstractLoadedSpecies]) > 0
         return maximum([k for (k, v) in species_registry if typeof(v) <: AbstractLoadedSpecies]) + 1
     else
@@ -82,26 +82,15 @@ function get_next_species_index()
     end
 end
 
-get_next_species_index(species_set::SpeciesSet) = length(species_set.list_species) + 1
+get_next_index(set::AbstractSet) = length(set.list) + 1
+get_nspecies(set::AbstractSet) = length(set.list)
 
-get_nspecies(species_set::SpeciesSet) = length(species_set.list_species)
 
 
-function show_plasma_species()
-    list_elements = [getfield(@__MODULE__, n).symbol for n in names(@__MODULE__, all=true) if getfield(@__MODULE__, n) isa AbstractElement]
-    list_species = [getfield(@__MODULE__, n).symbol for n in names(@__MODULE__, all=true) if getfield(@__MODULE__, n) isa AbstractSpecies]
-    println(string.(list_elements))
-    println(string.(list_species))
-end
-
-function show_species()
-    check_status_species_registry(lock=true)
-    show(species_registry["species_set"])
-end
 
 function get_species_set(; enforce=true)
     if enforce
-        check_status_species_registry(lock=true)
+        check_status_species_registry(; lock=true)
         return species_registry["species_set"]
     elseif "species_set" ∈ keys(species_registry)
         return species_registry["species_set"]
@@ -112,7 +101,7 @@ end
 
 function get_nspecies()
     @assert "species_set" ∈ keys(species_registry)
-    check_status_species_registry(lock=true)
+    check_status_species_registry(; lock=true)
     return get_nspecies(species_registry["species_set"])
 end
 
@@ -168,19 +157,22 @@ end
 
 (Vector{<:LoadedSpecies})(::Vector{Any}) = (Vector{LoadedSpecies})()
 
-get_species(species_set::SpeciesSet{T}, type_species::Type{<:ParticleType}) where {T} = Vector{T}([s for s in species_set.list_species if type(s) <: type_species])
+get_species(species_set::SpeciesSet{T}, type_species::Type{<:ParticleType}) where {T} = Vector{T}([s for s in species_set.list if type(s) <: type_species])
 "$TYPEDSIGNATURES get a list of active species"
-get_species(species_set::SpeciesSet{T}) where {T} = species_set.list_species::Vector{T}
+get_species(species_set::SpeciesSet{T}) where {T} = species_set.list::Vector{T}
 
 "$TYPEDSIGNATURES get a list of active species"
-get_all(species_set::SpeciesSet{T}; kw...) where {T} = species_set.list_species::Vector{T}
+get_all(species_set::SpeciesSet{T}; kw...) where {T} = species_set.list::Vector{T}
+
+"$TYPEDSIGNATURES get a list of active species"
+get_all(set::ElementsSet{T}; kw...) where {T} = set.list::Vector{T}
 
 "$TYPEDSIGNATURES get a list of the mass of active species"
-get_species_masses(species_set::SpeciesSet) :: SpeciesMasses = SpeciesMasses([s.mass for s in species_set.list_species])
+get_species_masses(species_set::SpeciesSet)::SpeciesMasses = SpeciesMasses([s.mass for s in species_set.list])
 SpeciesMasses(species_set::SpeciesSet; kw...) = get_species_masses(species_set)
 
 "$TYPEDSIGNATURES get a list of the mass of active species"
-get_species_reduced_masses(species_set::SpeciesSet)::SpeciesReducedMasses = SpeciesReducedMasses([s.mass for s in species_set.list_species])
+get_species_reduced_masses(species_set::SpeciesSet)::SpeciesReducedMasses = SpeciesReducedMasses([s.mass for s in species_set.list])
 SpeciesReducedMasses(species_set::SpeciesSet; kw...) = get_species_reduced_masses(species_set)
 
 "$TYPEDSIGNATURES get a list of the charge state of active species"
@@ -189,10 +181,10 @@ get_species_charge_states(s::AbstractSpecies)::SpeciesChargeStates = SpeciesChar
 get_species_charge_state(s::AbstractLoadedSpecies)::SpeciesChargeState = s.charge_state
 SpeciesChargeStates(species_set::SpeciesSet; kw...) = get_species_charge_states(species_set)
 "$TYPEDSIGNATURES get a list of the charge state of active species"
-get_species_charge_states(species_set::SpeciesSet)::SpeciesChargeStates = SpeciesChargeStates([s.charge_state for s in species_set.list_species])
+get_species_charge_states(species_set::SpeciesSet)::SpeciesChargeStates = SpeciesChargeStates([s.charge_state for s in species_set.list])
 
 "$TYPEDSIGNATURES get a list of the charge state of active species"
-get_active(species_set::SpeciesSet; kw...)::Vector{Float64} = filter(x -> x.is_active.bool[1], species_set.list_species)
+get_active(species_set::SpeciesSet; kw...)::Vector{Float64} = filter(x -> x.is_active.bool[1], species_set.list)
 
 "$TYPEDSIGNATURES get a list of ions among active species"
 get_ions(species_set::SpeciesSet; kw...) = get_species(species_set, Ions)
@@ -280,15 +272,15 @@ get_species_indexes(species::AbstractSpecies)::SpeciesIndexes = get_species_inde
 
 get_species_indexes(species_set::SpeciesSet, s::Int64)::SpeciesIndexes = get_species_indexes(species_set, get_species(species_set, s))
 get_species_indexes(species_set::SpeciesSet, s::Missing)::SpeciesIndexes = SpeciesIndexes()
-get_species_indexes(species_set::SpeciesSet)::SpeciesIndexes= get_species_indexes(species_set.list_species)
+get_species_indexes(species_set::SpeciesSet)::SpeciesIndexes = get_species_indexes(species_set.list)
 get_species_indexes(species_set::SpeciesSet, s::Symbol)::SpeciesIndexes = get_species_indexes(get_species(species_set, s))
 get_species_index(t::Tuple{LoadedSpecies{T1},LoadedSpecies{T2}}) where {T1,T2} = BinarySpeciesIndex{T1,T2}(get_species_index(t[1]).value, get_species_index(t[2]).value)
 get_species_index_int(t::Tuple{LoadedSpecies{T1},LoadedSpecies{T2}}) where {T1,T2} = (get_species_index(t[1]).value, get_species_index(t[2]).value)
 
 get_species_indexes(species_set::SpeciesSet, s::AbstractSpecies) = get_species_indexes(species_set, [s])
 get_species_indexes(species_set::SpeciesSet, s::AbstractSpeciesIndexes) = get_species_indexes(species_set, s.value)
-function get_species_indexes(species_set::SpeciesSet, s::Union{Vector{<:Any},Vector{<:AbstractSpecies},Vector{Symbol},Vector{Int64}})::SpeciesIndexes 
-     length(get_species(species_set, s)) > 0 ? SpeciesIndexes([get_species_index(ss) for ss in get_species(species_set, s)]) : SpeciesIndexes()
+function get_species_indexes(species_set::SpeciesSet, s::Union{Vector{<:Any},Vector{<:AbstractSpecies},Vector{Symbol},Vector{Int64}})::SpeciesIndexes
+    length(get_species(species_set, s)) > 0 ? SpeciesIndexes([get_species_index(ss) for ss in get_species(species_set, s)]) : SpeciesIndexes()
 end
 
 @inline tuplejoin(x) = x
@@ -298,9 +290,9 @@ get_species(el::Element) = Tuple(s for s in element_species_registry[el])
 get_species(els::Vector{<:Element}) = tuplejoin((get_species(el) for el in els)...)
 iterate_species(species_set::SpeciesSet, arg::Vararg{N,<:Union{AbstractElement,AbstractSpecies}}) where {N} = iterate_species(species_set, [arg...])
 iterate_species(arg::Vararg{N,<:Union{AbstractElement,AbstractSpecies}}) where {N} = iterate_species([arg...])
-iterate_species(species::Vector)= Base.IteratorsMD.flatten(((get_species(s) for s in species)...,))
-iterate_species(species_set::SpeciesSet, species::Vector) = Base.IteratorsMD.flatten(((get_species(species_set,s) for s in species)...,))
- export iterate_species
+iterate_species(species::Vector) = Base.IteratorsMD.flatten(((get_species(s) for s in species)...,))
+iterate_species(species_set::SpeciesSet, species::Vector) = Base.IteratorsMD.flatten(((get_species(species_set, s) for s in species)...,))
+export iterate_species
 
 
 
@@ -310,34 +302,34 @@ iterate_species(species_set::SpeciesSet, species::Vector) = Base.IteratorsMD.fla
 function get_species(species_set::SpeciesSet, s::Symbol)
     if s in keys(species_category)
         return species_category[s](species_set)
-    elseif s ∈ [ss.element.symbol for ss in species_set.list_species]
-        return filter(x -> Symbol(x.element.symbol) == s, species_set.list_species)
-    elseif s ∈ [ss.symbol for ss in species_set.list_species]
-        return filter(x -> Symbol(x.symbol) == s, species_set.list_species)
+    elseif s ∈ [ss.element.symbol for ss in species_set.list]
+        return filter(x -> Symbol(x.element.symbol) == s, species_set.list)
+    elseif s ∈ [ss.symbol for ss in species_set.list]
+        return filter(x -> Symbol(x.symbol) == s, species_set.list)
     else
-        error("species $s not loaded.... \n  Available species: $(species_set.list_species) \n Available elements: $(get_elements(species_set))")
+        error("species $s not loaded.... \n  Available species: $(species_set.list) \n Available elements: $(get_elements(species_set))")
     end
 end
 
 function get_species(species_set::SpeciesSet, s::Int64; kw...)
-    @assert s ∈ [ss.index.value for ss in species_set.list_species] "species $s not loaded. Available species $(name_(species_set))"
-    species = filter(x -> x.index.value == s, species_set.list_species)[1]
+    @assert s ∈ [ss.index.value for ss in species_set.list] "species $s not loaded. Available species $(name_(species_set))"
+    species = filter(x -> x.index.value == s, species_set.list)[1]
     return species
 
 end
 
-get_species(species_set::SpeciesSet, element::Element) = filter(x -> x.element == element, species_set.list_species)
+get_species(species_set::SpeciesSet, element::Element) = filter(x -> x.element == element, species_set.list)
 get_species(@nospecialize(species_set::SpeciesSet), @nospecialize(s::Vector))::Vector = vcat([get_species(species_set, sp) for sp in s]...)
-get_species(species_set::SpeciesSet, s::SpeciesIndexes)::Vector =  get_species(species_set, s.value)
+get_species(species_set::SpeciesSet, s::SpeciesIndexes)::Vector = get_species(species_set, s.value)
 get_species(species_set::SpeciesSet, s::BinarySpeciesIndex)::Tuple = (get_species(species_set, s.s1), get_species(species_set, s.s2))
 
-get_species(species_set::SpeciesSet, elements::Vector{<:Element}) = filter(x -> x.element ∈ elements, species_set.list_species)
-get_species_except(species_set::SpeciesSet, species::LoadedSpecies) = filter(x -> x != species, species_set.list_species)
+get_species(species_set::SpeciesSet, elements::Vector{<:Element}) = filter(x -> x.element ∈ elements, species_set.list)
+get_species_except(species_set::SpeciesSet, species::LoadedSpecies) = filter(x -> x != species, species_set.list)
 get_species(species_set::SpeciesSet, element::Element, Z::Int64) = get_species(species_set, get_species_symbol(element.symbol, Z))
 get_species(species_set::SpeciesSet, species::LoadedSpecies) = species
 get_species(species_set::SpeciesSet, species::Tuple{LoadedSpecies,LoadedSpecies}) = species
 
-get_species(species_set::SpeciesSet, s::Vector{Int64}) = [ss for sss in s for ss in filter(x -> x.index.value == sss, species_set.list_species)]
+get_species(species_set::SpeciesSet, s::Vector{Int64}) = [ss for sss in s for ss in filter(x -> x.index.value == sss, species_set.list)]
 function get_species(species_set::SpeciesSet, s::Vector{T}) where {T<:Union{AbstractLoadedSpecies,Symbol}}
     out = Vector{LoadedSpecies}()
     for ss in s
@@ -356,7 +348,7 @@ get_electron_species(species_set::SpeciesSet) = get_electron(species_set)
 
 get_species_parameters(; kw...) = SpeciesParameters(; kw...)
 
-get_nspc(species_set::SpeciesSet) = length(species_set.list_species)
+get_nspc(species_set::SpeciesSet) = length(species_set.list)
 
 const species_category = Dict(:all => get_all,
     :default => get_all,
@@ -373,10 +365,15 @@ const species_category = Dict(:all => get_all,
     :electron => get_electron,
     :active => get_active
 )
+const elements_category = Dict(:all => get_all
+)
 
-function setup_groups!(species_set)
-    for (k,v) in species_category
-        species_set.groups[k] = v(species_set; enforce=false)
+get_category(::SpeciesSet) = species_category
+get_category(::ElementsSet) = elements_category
+
+function setup_groups!(set)
+    for (k, v) in get_category(set)
+        set.groups[k] = v(set; enforce=false)
     end
 end
 
