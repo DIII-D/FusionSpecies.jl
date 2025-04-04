@@ -1,7 +1,7 @@
 name = "FusionSpecies"
 uuid = "50b852fb-755b-4f1c-b4e6-649ec8fe8475"
 authors = ["Jerome Guterl"]
-version = "1.0.2"
+version = "1.0.3"
 
 [deps]
 Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
